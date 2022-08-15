@@ -16,7 +16,12 @@
             "exec_path": "C:\\Users\\monem\\AppData\\Local\\Viber\\Viber.exe",
             "args": ""
         }
-    
+        ,
+        {
+            "exec_path": "C:\\Users\\monem\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.9_qbz5n2kfra8p0\\python.exe",
+            "args": "d:\\WindowsWatchdog\\hello.py"
+        }
+         
         
     ]
 }
