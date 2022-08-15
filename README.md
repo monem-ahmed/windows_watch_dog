@@ -8,4 +8,4 @@ For VSCode Setup I have followed this link: https://code.visualstudio.com/docs/c
 To compile code with VSCode open VSCode from **Developer Command Prompt** using *code .* and select *cl.exe* as compiler
 
 #### Dependencies:
- I have Used nlohmann's json library to parse the json. Single header is included in the repository
+ I have Used nlohmann's json (https://github.com/nlohmann/json) library to parse the json. Single header is included in the repository
