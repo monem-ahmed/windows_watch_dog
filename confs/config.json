@@ -1,0 +1,22 @@
+{
+    "processes": [
+        {
+            "exec_path": "C:\\Program Files\\Windows Media Player\\wmplayer.exe",
+            "args": ""
+        },
+        {
+            "exec_path": "notepad.exe",
+            "args": ""
+        },
+        {
+            "exec_path": "C:\\Program Files (x86)\\Foxit Software\\Foxit PDF Reader\\FoxitPDFReader.exe",
+            "args": ""
+        },
+        {
+            "exec_path": "C:\\Users\\monem\\AppData\\Local\\Viber\\Viber.exe",
+            "args": ""
+        }
+    
+        
+    ]
+}
