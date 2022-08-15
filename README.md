@@ -9,3 +9,9 @@ To compile code with VSCode open VSCode from **Developer Command Prompt** using 
 
 #### Dependencies:
  I have Used nlohmann's json library to parse the json. Single header is included in the repository
+
+ #### Configuration File
+Place Configuratio file in the relative directory ./confs/config.json
+update the json file as per example given:
+1. write full path of the executable
+2. write necessery command line arguments as a string
