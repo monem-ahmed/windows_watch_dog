@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <Windows.h>
+#include <winternl.h>
 // #include <cstringt.h>
 #include "json.hpp"
 #include <vector>
@@ -12,6 +13,12 @@ const std::string conf_file = ".\\confs\\config.json";
 DWORD WINAPI WatchFile(PVOID);
 char FileName[60];
 char FileExt[5];
+typedef NTSTATUS(NTAPI *_NtQueryInformationProcess)(
+    HANDLE ProcessHandle,
+    DWORD ProcessInformationClass, /* can't be bothered defining the whole enum */
+    PVOID ProcessInformation,
+    DWORD ProcessInformationLength,
+    PDWORD ReturnLength);
 
 char *return_name(std::string exec_path) // return executable filename from fullPath
 {
@@ -210,11 +217,29 @@ void check_existing_process()
                                { return strcmp(x.name, val); });
         if (ite != ProcessToBeTracked.end() && !(*ite).handle_created)
         {
-            (*ite).set_ppid(pe.th32ProcessID);
-            (*ite).set_handle(OpenProcess(SYNCHRONIZE, FALSE, pe.th32ProcessID));
-            (*ite).handle_created = TRUE;
-            std::cout << "Opened Handle For an Existing Process"
-                      << " " << pe.szExeFile << std::endl;
+            DWORD dwSize = sizeof(PROCESS_BASIC_INFORMATION);
+            HANDLE hProcess = (OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION |
+                                               PROCESS_VM_READ,
+                                           FALSE, pe.th32ProcessID));
+
+            PROCESS_BASIC_INFORMATION pinfo;
+            if (hProcess != INVALID_HANDLE_VALUE)
+            {
+                DWORD no_of_bytes = sizeof(PROCESS_BASIC_INFORMATION);
+                _NtQueryInformationProcess NtQueryInformationProcess = (_NtQueryInformationProcess)GetProcAddress(
+                    GetModuleHandleA("ntdll.dll"), "NtQueryInformationProcess");
+                LONG status = NtQueryInformationProcess(hProcess,
+                                                        ProcessBasicInformation,
+                                                        &pinfo,
+                                                        dwSize,
+                                                        &no_of_bytes);
+                std::cout<<"Base Address" << pinfo.PebBaseAddress<<std::endl;
+                // (*ite).set_ppid(pe.th32ProcessID);
+                // (*ite).set_handle(OpenProcess(SYNCHRONIZE, FALSE, pe.th32ProcessID));
+                // (*ite).handle_created = TRUE;
+                // std::cout << "Opened Handle For an Existing Process"
+                //           << " " << pe.szExeFile << std::endl;
+            }
         }
 
     } while (::Process32Next(hSnapshot, &pe));
@@ -294,7 +319,7 @@ void update_process_list(std::vector<MyProcess> BufVec)
     }
 }
 
-//Watch the Config File Dynamically
+// Watch the Config File Dynamically
 DWORD WINAPI WatchFile(PVOID)
 {
     printf("WatchFile Thread Id: %u\n", GetCurrentThreadId());
