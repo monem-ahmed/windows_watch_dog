@@ -2,7 +2,7 @@
 #include <fstream>
 #include <Windows.h>
 #include <winternl.h>
-// #include <cstringt.h>
+#include "get_cmd_line.h"
 #include "json.hpp"
 #include <vector>
 #include <stdio.h>
@@ -13,12 +13,6 @@ const std::string conf_file = ".\\confs\\config.json";
 DWORD WINAPI WatchFile(PVOID);
 char FileName[60];
 char FileExt[5];
-typedef NTSTATUS(NTAPI *_NtQueryInformationProcess)(
-    HANDLE ProcessHandle,
-    DWORD ProcessInformationClass, /* can't be bothered defining the whole enum */
-    PVOID ProcessInformation,
-    DWORD ProcessInformationLength,
-    PDWORD ReturnLength);
 
 char *return_name(std::string exec_path) // return executable filename from fullPath
 {
@@ -41,12 +35,14 @@ class MyProcess // Class for handling the process
 public:
     CHAR executable_path[500];
     CHAR name[60];
-    CHAR arguments[500];
+    CHAR arguments[1000];
     BOOL handle_created;
     MyProcess(std::string exe_path, std::string args)
     {
         strcpy(executable_path, exe_path.c_str());
-        strcpy(arguments, args.c_str());
+        strcpy(arguments, exe_path.c_str());
+        strcat(arguments, " ");
+        strcat(arguments, args.c_str());
         char *FileName = return_name(executable_path);
         strcpy(name, FileName);
         handle_created = FALSE;
@@ -73,13 +69,19 @@ public:
 void create_process();
 std::vector<MyProcess> ProcessToBeTracked;
 void read_config_file();
-void check_existing_process();
+int check_existing_process();
 
 int main()
 {
-    read_config_file();       // read config file first
-    check_existing_process(); // check which processes are already opened, get handle of them
-    create_process();         // create rest of the processes
+    read_config_file(); // read config file first
+    int check_status = check_existing_process();
+    if (check_status == 1)
+        printf("Existing Process Checked");
+    else
+    {
+        printf("Returned with Error: %d", check_status);
+    }                 // check which processes are already opened, get handle of them
+    create_process(); // create rest of the processes
 
     for (auto p = 0; p < ProcessToBeTracked.size(); ++p)
     {
@@ -127,9 +129,7 @@ void create_process()
             si.cb = sizeof(si);
             ZeroMemory(&pi, sizeof(pi));
             char command[200];
-            strcpy(command, (*i).executable_path);
-            strcat(command, " ");
-            strcat(command, (*i).arguments);
+            strcpy(command, (*i).arguments);
             // Start the child process.
             if (!CreateProcessA(NULL,    // No module name (use command line)
                                 command, // Command line
@@ -167,10 +167,8 @@ void read_config_file()
     f.open(conf_file);
 
     nlohmann::json data = nlohmann::json::parse(f, nullptr, false);
-    std::cout << data << std::endl;
     if (!data.is_discarded()) // Check if json data are valid
     {
-        printf("JSON Data Read Successful");
         for (auto it = data.at("processes").begin(); it != data.at("processes").end(); ++it)
         {
 
@@ -195,9 +193,10 @@ int Error(const char *text)
 }
 
 // Check Which Processes are already opened using their name, get handle of them
-void check_existing_process()
+int check_existing_process()
 {
     HANDLE hSnapshot = ::CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    printf("Checking for existing processes\n");
     if (hSnapshot == INVALID_HANDLE_VALUE)
         Error("Failed to create snapshot");
 
@@ -217,34 +216,142 @@ void check_existing_process()
                                { return strcmp(x.name, val); });
         if (ite != ProcessToBeTracked.end() && !(*ite).handle_created)
         {
-            DWORD dwSize = sizeof(PROCESS_BASIC_INFORMATION);
+            printf("Found One Process already existing : %s\n", (*ite).name);
+
+            SYSTEM_INFO si;
+            GetNativeSystemInfo(&si);
+            BOOL wow;
+            IsWow64Process(GetCurrentProcess(), &wow);
+            std::cout << "IsWoW: " << wow << std::endl;
+            // use WinDbg "dt ntdll!_PEB" command and search for ProcessParameters offset to find the truth out
+            DWORD ProcessParametersOffset = si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? 0x20 : 0x10;
+            DWORD CommandLineOffset = si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? 0x70 : 0x40;
+            DWORD pebSize = ProcessParametersOffset + 8;
+            PBYTE peb = (PBYTE)malloc(pebSize);
+            ZeroMemory(peb, pebSize);
+
+            // read basic info to get CommandLine address, we only need the beginning of ProcessParameters
+            DWORD ppSize = CommandLineOffset + 16;
+            PBYTE pp = (PBYTE)malloc(ppSize);
+            ZeroMemory(pp, ppSize);
+
+            PWSTR cmdLine;
+
             HANDLE hProcess = (OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION |
                                                PROCESS_VM_READ,
                                            FALSE, pe.th32ProcessID));
-
-            PROCESS_BASIC_INFORMATION pinfo;
-            if (hProcess != INVALID_HANDLE_VALUE)
+            DWORD err;
+            if (wow)
             {
-                DWORD no_of_bytes = sizeof(PROCESS_BASIC_INFORMATION);
-                _NtQueryInformationProcess NtQueryInformationProcess = (_NtQueryInformationProcess)GetProcAddress(
-                    GetModuleHandleA("ntdll.dll"), "NtQueryInformationProcess");
-                LONG status = NtQueryInformationProcess(hProcess,
-                                                        ProcessBasicInformation,
-                                                        &pinfo,
-                                                        dwSize,
-                                                        &no_of_bytes);
-                std::cout<<"Base Address" << pinfo.PebBaseAddress<<std::endl;
-                // (*ite).set_ppid(pe.th32ProcessID);
-                // (*ite).set_handle(OpenProcess(SYNCHRONIZE, FALSE, pe.th32ProcessID));
-                // (*ite).handle_created = TRUE;
-                // std::cout << "Opened Handle For an Existing Process"
-                //           << " " << pe.szExeFile << std::endl;
+                // we're running as a 32-bit process in a 64-bit OS
+                PROCESS_BASIC_INFORMATION_WOW64 pbi;
+                ZeroMemory(&pbi, sizeof(pbi));
+
+                // get process information from 64-bit world
+                _NtQueryInformationProcess query = (_NtQueryInformationProcess)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtWow64QueryInformationProcess64");
+                err = query(hProcess, 0, &pbi, sizeof(pbi), NULL);
+                if (err != 0)
+                {
+                    printf("NtWow64QueryInformationProcess64 failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+
+                // read PEB from 64-bit address space
+                _NtWow64ReadVirtualMemory64 read = (_NtWow64ReadVirtualMemory64)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtWow64ReadVirtualMemory64");
+                err = read(hProcess, pbi.PebBaseAddress, peb, pebSize, NULL);
+                if (err != 0)
+                {
+                    printf("NtWow64ReadVirtualMemory64 PEB failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+
+                // read ProcessParameters from 64-bit address space
+                // PBYTE* parameters = (PBYTE*)*(LPVOID*)(peb + ProcessParametersOffset); // address in remote process address space
+                PVOID64 parameters = (PVOID64) * ((PVOID64 *)(peb + ProcessParametersOffset)); // corrected 64-bit address, see comments
+                err = read(hProcess, parameters, pp, ppSize, NULL);
+                if (err != 0)
+                {
+                    printf("NtWow64ReadVirtualMemory64 Parameters failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+
+                // read CommandLine
+                UNICODE_STRING_WOW64 *pCommandLine = (UNICODE_STRING_WOW64 *)(pp + CommandLineOffset);
+                cmdLine = (PWSTR)malloc(pCommandLine->MaximumLength);
+                err = read(hProcess, pCommandLine->Buffer, cmdLine, pCommandLine->MaximumLength, NULL);
+                if (err != 0)
+                {
+                    printf("NtWow64ReadVirtualMemory64 Parameters failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+            }
+            else
+            {
+                // we're running as a 32-bit process in a 32-bit OS, or as a 64-bit process in a 64-bit OS
+                PROCESS_BASIC_INFORMATION pbi;
+                ZeroMemory(&pbi, sizeof(pbi));
+
+                // get process information
+                _NtQueryInformationProcess query = (_NtQueryInformationProcess)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryInformationProcess");
+                err = query(hProcess, 0, &pbi, sizeof(pbi), NULL);
+                if (err != 0)
+                {
+                    printf("NtQueryInformationProcess failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+
+                // read PEB
+                if (!ReadProcessMemory(hProcess, pbi.PebBaseAddress, peb, pebSize, NULL))
+                {
+                    printf("ReadProcessMemory PEB failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+
+                // read ProcessParameters
+                PBYTE *parameters = (PBYTE *)*(LPVOID *)(peb + ProcessParametersOffset); // address in remote process adress space
+                if (!ReadProcessMemory(hProcess, parameters, pp, ppSize, NULL))
+                {
+                    printf("ReadProcessMemory Parameters failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+
+                // read CommandLine
+                UNICODE_STRING *pCommandLine = (UNICODE_STRING *)(pp + CommandLineOffset);
+                cmdLine = (PWSTR)malloc(pCommandLine->MaximumLength);
+                if (!ReadProcessMemory(hProcess, pCommandLine->Buffer, cmdLine, pCommandLine->MaximumLength, NULL))
+                {
+                    printf("ReadProcessMemory Parameters failed\n");
+                    CloseHandle(hProcess);
+                    return -1;
+                }
+            }
+            char cmd_buf[1000];
+            wcstombs(cmd_buf, cmdLine, 1000);
+            char *nEnd = std::remove(std::begin(cmd_buf), std::end(cmd_buf), '"');
+            *nEnd = '\0';
+            printf("%s\n", cmd_buf);
+            printf("%s\n", (*ite).arguments);
+            if (!strcmp((*ite).arguments, cmd_buf))
+            {
+                printf("Both the exe file and args matched");
+                    (*ite).set_ppid(pe.th32ProcessID);
+                    (*ite).set_handle(hProcess);
+                    (*ite).handle_created = TRUE;
+                    std::cout << "Opened Handle For an Existing Process"
+                              << " " << pe.szExeFile << std::endl;
             }
         }
-
     } while (::Process32Next(hSnapshot, &pe));
 
     ::CloseHandle(hSnapshot);
+    return 1;
 }
 
 // Update the Process Tracking List After The configuration fie is modified
