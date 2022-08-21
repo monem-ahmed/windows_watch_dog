@@ -1,0 +1,6 @@
+discaded/
+*.exe
+*.obj
+*.ilk
+*.pdb
+log/

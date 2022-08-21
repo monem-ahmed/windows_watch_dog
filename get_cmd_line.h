@@ -1,7 +1,6 @@
 #pragma once
 
-#include <plog/Log.h> // Step1: include the headers
-#include "plog/Initializers/RollingFileInitializer.h"
+
 // NtQueryInformationProcess for pure 32 and 64-bit processes
 typedef NTSTATUS (NTAPI *_NtQueryInformationProcess)(
     IN HANDLE ProcessHandle,
