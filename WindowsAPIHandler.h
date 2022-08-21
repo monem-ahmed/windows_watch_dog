@@ -15,7 +15,7 @@ void create_process(std::vector<MyProcess> *ProcessToBeTracked);
 bool check_existing_process(std::vector<MyProcess> *ProcessToBeTracked);
 // Get Command Line Arguments of a process
 bool get_cmd_args(PROCESSENTRY32 pe, char *cmd_buf, HANDLE *hOpenProcess);
-// Watch the Config Directory For any changes in config file size or lastwrite and call update_process_list
-DWORD WINAPI WatchFile(PVOID);
+// Watch the Config Directory in a seperate thread For any changes in config file size or lastwrite and call update_process_list
+bool create_thread_watch_directory(std::vector<MyProcess> *PProcessToBeTracked);
 // Update the ProcessToBeTracked List After JSON File is changed
 void update_process_list(PVOID PvOIDProcessToBeTracked);

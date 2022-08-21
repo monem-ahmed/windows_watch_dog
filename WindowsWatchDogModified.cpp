@@ -3,12 +3,11 @@
 #include <vector>
 #include <stdio.h>
 
-
 int main()
 {
-    plog::init(plog::debug, log_file);                 // Initialize Log File
-    std::vector<MyProcess> ProcessToBeTracked;         // Vector to store process Instances which need to be tracked
-    nlohmann::json data = read_config_file(); // File API-read config file first
+    plog::init(plog::debug, log_file);         // Initialize Log File
+    std::vector<MyProcess> ProcessToBeTracked; // Vector to store process Instances which need to be tracked
+    nlohmann::json data = read_config_file();  // File API-read config file first
     bool read_config_status = init_processes(data, &ProcessToBeTracked);
     if (read_config_status)
         PLOG_DEBUG << "Processes Initialized";
@@ -26,10 +25,14 @@ int main()
         PLOG_DEBUG << "Created/Opened Process, Name: " << ProcessToBeTracked[p].name << " ID: " << ProcessToBeTracked[p].get_ppid();
 
     // Start a thread for Monitoring The File
-    HANDLE WatchFileThread = CreateThread(nullptr, 0, WatchFile, &ProcessToBeTracked, 0, nullptr);
-    if (!WatchFileThread)
+    bool is_thread = create_thread_watch_directory(&ProcessToBeTracked);
+    if (is_thread)
     {
-        PLOG_ERROR << "Failed to create thread error=" << GetLastError();
+        PLOG_DEBUG << "Directory Watching on going in seperate thread";
+    }
+    else
+    {
+        PLOG_ERROR << "Failed to create thread";
     }
 
     // Periodically Monitor the processes
@@ -51,4 +54,3 @@ int main()
     return 0;
 }
 // Reading Configuration file from ./confs/config.json
-

@@ -1,6 +1,5 @@
 #include "WindowsAPIHandler.h"
 
-
 // Create Process from the global list, If handles are not opened already
 void create_process(std::vector<MyProcess> *ProcessToBeTracked)
 {
@@ -235,6 +234,7 @@ bool check_existing_process(std::vector<MyProcess> *ProcessToBeTracked)
 
     return true;
 }
+
 // Watch the Config File Dynamically
 DWORD WINAPI WatchFile(PVOID PProcessToBeTracked)
 {
@@ -280,6 +280,19 @@ DWORD WINAPI WatchFile(PVOID PProcessToBeTracked)
             break;
         }
     }
+}
+
+//Create a thread for WatchFile
+bool create_thread_watch_directory(std::vector<MyProcess> *PProcessToBeTracked)
+{
+    HANDLE WatchFileThread = CreateThread(nullptr, 0, WatchFile, PProcessToBeTracked, 0, nullptr);
+
+    if (!WatchFileThread)
+    {
+        PLOG_ERROR << "Failed to create thread error=" << GetLastError();
+        return false;
+    }
+    return true;
 }
 // Update the Process Tracking List After The configuration fie is modified
 void update_process_list(PVOID PvOIDProcessToBeTracked)
