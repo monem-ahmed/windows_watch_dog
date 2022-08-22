@@ -6,14 +6,14 @@
         },
         {
             "exec_path": "C:\\Windows\\notepad.exe",
-            "args": "D:\\WindowsWatchdog\\windows_watch_dog\\confs\\config.json"
+            "args": "J:\\CPP_Arena\\windows_watch_dog\\confs\\config.json"
         },
         {
             "exec_path": "C:\\Program Files (x86)\\Foxit Software\\Foxit PDF Reader\\FoxitPDFReader.exe",
             "args": ""
         },
         {
-            "exec_path": "C:\\Users\\monem\\AppData\\Local\\Viber\\Viber.exe",
+            "exec_path": "C:\\Users\\monem44295\\AppData\\Local\\Viber\\Viber.exe",
             "args": ""
         }
 

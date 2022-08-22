@@ -12,22 +12,22 @@ void create_process(std::vector<MyProcess> *ProcessToBeTracked)
             ZeroMemory(&si, sizeof(si));
             si.cb = sizeof(si);
             ZeroMemory(&pi, sizeof(pi));
-            char command[200];
-            strcpy(command, (*i).arguments);
+            // char command[200];
+            // strcpy(command, (*i).arguments);
             // Start the child process.
-            if (!CreateProcessA(NULL,    // No module name (use command line)
-                                command, // Command line
-                                NULL,    // Process handle not inheritable
-                                NULL,    // Thread handle not inheritable
-                                FALSE,   // Set handle inheritance to FALSE
-                                0,       // No creation flags
-                                NULL,    // Use parent's environment block
-                                NULL,    // Use parent's starting directory
-                                &si,     // Pointer to STARTUPINFO structure
-                                &pi)     // Pointer to PROCESS_INFORMATION structure
+            if (!CreateProcessA(NULL,           // No module name (use command line)
+                                (*i).arguments, // Command line
+                                NULL,           // Process handle not inheritable
+                                NULL,           // Thread handle not inheritable
+                                FALSE,          // Set handle inheritance to FALSE
+                                0,              // No creation flags
+                                NULL,           // Use parent's environment block
+                                NULL,           // Use parent's starting directory
+                                &si,            // Pointer to STARTUPINFO structure
+                                &pi)            // Pointer to PROCESS_INFORMATION structure
             )
             {
-                PLOG_ERROR << "CreateProcess failed " << GetLastError();
+                PLOG_ERROR << "CreateProcess failed for " << (*i).arguments << " Error: " << GetLastError();
                 return;
             }
             else
@@ -227,6 +227,12 @@ bool check_existing_process(std::vector<MyProcess> *ProcessToBeTracked)
                 (*ite).handle_created = TRUE;
                 PLOG_DEBUG << "Opened Handle For an Existing Process " << pe.szExeFile;
             }
+            else
+            {
+                PLOG_DEBUG << "Arguments Doesn't Match";
+                PLOG_DEBUG << "Command Line For Desired Process : "<<(*ite).arguments;
+                PLOG_DEBUG << "Command Line For Existing Process : "<<cmd_buf;
+            }
         }
     } while (::Process32Next(hSnapshot, &pe));
 
@@ -282,7 +288,7 @@ DWORD WINAPI WatchFile(PVOID PProcessToBeTracked)
     }
 }
 
-//Create a thread for WatchFile
+// Create a thread for WatchFile
 bool create_thread_watch_directory(std::vector<MyProcess> *PProcessToBeTracked)
 {
     HANDLE WatchFileThread = CreateThread(nullptr, 0, WatchFile, PProcessToBeTracked, 0, nullptr);
