@@ -230,8 +230,8 @@ bool check_existing_process(std::vector<MyProcess> *ProcessToBeTracked)
             else
             {
                 PLOG_DEBUG << "Arguments Doesn't Match";
-                PLOG_DEBUG << "Command Line For Desired Process : "<<(*ite).arguments;
-                PLOG_DEBUG << "Command Line For Existing Process : "<<cmd_buf;
+                PLOG_DEBUG << "Command Line For Desired Process : " << (*ite).arguments;
+                PLOG_DEBUG << "Command Line For Existing Process : " << cmd_buf;
             }
         }
     } while (::Process32Next(hSnapshot, &pe));
@@ -240,67 +240,6 @@ bool check_existing_process(std::vector<MyProcess> *ProcessToBeTracked)
 
     return true;
 }
-
-// Watch the Config File Dynamically
-DWORD WINAPI WatchFile(PVOID PProcessToBeTracked)
-{
-    PLOG_DEBUG << "WatchFile Thread Id: ", GetCurrentThreadId();
-    DWORD dwWaitStatus;
-    HANDLE dwChangeHandle;
-    std::string path = ExePath() + "\\confs";
-    // Get a Handle for watching Directory, Watch on File Size Change, Last Write
-    dwChangeHandle = FindFirstChangeNotificationA(
-        path.c_str(),                                             // directory to watch
-        FALSE,                                                    // do not watch subtree
-        FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE); // watch file name changes
-
-    if (dwChangeHandle == INVALID_HANDLE_VALUE)
-    {
-        PLOG_ERROR << "FindFirstChangeNotification function failed";
-        ExitProcess(GetLastError());
-    }
-
-    while (TRUE)
-    {
-        PLOG_DEBUG << "Waiting for notification...";
-        dwWaitStatus = WaitForSingleObject(dwChangeHandle, INFINITE);
-
-        switch (dwWaitStatus)
-        {
-        case WAIT_OBJECT_0: // Triggered On Directory Change
-
-            PLOG_DEBUG << "Directory Change Notification ";
-
-            update_process_list(PProcessToBeTracked);
-            if (FindNextChangeNotification(dwChangeHandle) == FALSE)
-            {
-
-                PLOG_ERROR << "FindNextChangeNotification function failed.";
-                ExitProcess(GetLastError());
-            }
-            break;
-
-        default:
-            PLOG_ERROR << "Unhandled dwWaitStatus.";
-            ExitProcess(GetLastError());
-            break;
-        }
-    }
-}
-
-// Create a thread for WatchFile
-bool create_thread_watch_directory(std::vector<MyProcess> *PProcessToBeTracked)
-{
-    HANDLE WatchFileThread = CreateThread(nullptr, 0, WatchFile, PProcessToBeTracked, 0, nullptr);
-
-    if (!WatchFileThread)
-    {
-        PLOG_ERROR << "Failed to create thread error=" << GetLastError();
-        return false;
-    }
-    return true;
-}
-// Update the Process Tracking List After The configuration fie is modified
 void update_process_list(PVOID PvOIDProcessToBeTracked)
 {
     // Cast Void Pointer to ProcessToBeTracked *
@@ -373,3 +312,64 @@ void update_process_list(PVOID PvOIDProcessToBeTracked)
         PLOG_ERROR << "Corrupted JSON Data";
     }
 }
+
+// Watch the Config File Dynamically
+DWORD WINAPI WatchFile(PVOID PProcessToBeTracked)
+{
+    PLOG_DEBUG << "WatchFile Thread Id: ", GetCurrentThreadId();
+    DWORD dwWaitStatus;
+    HANDLE dwChangeHandle;
+    std::string path = ExePath() + "\\confs";
+    // Get a Handle for watching Directory, Watch on File Size Change, Last Write
+    dwChangeHandle = FindFirstChangeNotificationA(
+        path.c_str(),                                             // directory to watch
+        FALSE,                                                    // do not watch subtree
+        FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE); // watch file name changes
+
+    if (dwChangeHandle == INVALID_HANDLE_VALUE)
+    {
+        PLOG_ERROR << "FindFirstChangeNotification function failed";
+        ExitProcess(GetLastError());
+    }
+
+    while (TRUE)
+    {
+        PLOG_DEBUG << "Waiting for notification...";
+        dwWaitStatus = WaitForSingleObject(dwChangeHandle, INFINITE);
+
+        switch (dwWaitStatus)
+        {
+        case WAIT_OBJECT_0: // Triggered On Directory Change
+
+            PLOG_DEBUG << "Directory Change Notification ";
+
+            update_process_list(PProcessToBeTracked);
+            if (FindNextChangeNotification(dwChangeHandle) == FALSE)
+            {
+
+                PLOG_ERROR << "FindNextChangeNotification function failed.";
+                ExitProcess(GetLastError());
+            }
+            break;
+
+        default:
+            PLOG_ERROR << "Unhandled dwWaitStatus.";
+            ExitProcess(GetLastError());
+            break;
+        }
+    }
+}
+
+// Create a thread for WatchFile
+bool create_thread_watch_directory(std::vector<MyProcess> *PProcessToBeTracked)
+{
+    HANDLE WatchFileThread = CreateThread(nullptr, 0, WatchFile, PProcessToBeTracked, 0, nullptr);
+
+    if (!WatchFileThread)
+    {
+        PLOG_ERROR << "Failed to create thread error=" << GetLastError();
+        return false;
+    }
+    return true;
+}
+// Update the Process Tracking List After The configuration fie is modified

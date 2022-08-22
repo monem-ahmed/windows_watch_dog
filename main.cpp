@@ -40,13 +40,8 @@ int main()
     {
         for (auto i = ProcessToBeTracked.begin(); i != ProcessToBeTracked.end(); i++)
         {
-            DWORD status;
-            if (GetExitCodeProcess((*i).get_handle(), &status))
-                if (status != STILL_ACTIVE) // Find Out Which Processes are killed
-                {
-                    PLOG_WARNING << (*i).name << " Is Dead";
-                    (*i).handle_created = false;
-                }
+            if (!(*i).is_running())
+                PLOG_WARNING << (*i).name << " Is Dead";
         }
         create_process(&ProcessToBeTracked); // Create processes those are killed
         Sleep(periodic_check_interval);      // Monitor after interval

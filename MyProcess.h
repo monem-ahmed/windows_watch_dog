@@ -18,4 +18,5 @@ public:
     HANDLE get_handle();
     void set_ppid(DWORD pid);
     DWORD get_ppid();
+    bool is_running();
 };

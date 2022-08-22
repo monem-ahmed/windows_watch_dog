@@ -25,3 +25,14 @@ DWORD MyProcess::get_ppid()
 {
     return this->ppid;
 }
+bool MyProcess::is_running()
+{
+    DWORD status;
+    if (GetExitCodeProcess(this->handle, &status))
+        if (status != STILL_ACTIVE) // Find Out Which Processes are killed
+        {
+            this->handle_created = false;
+            return false;
+        }
+    return true;
+}

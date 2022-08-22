@@ -8,7 +8,7 @@
 #include "plog/Initializers/RollingFileInitializer.h"
 #define conf_file ".\\confs\\config.json"
 #define log_file ".\\log\\watchdog.txt"
-#define periodic_check_interval 10000
+#define periodic_check_interval 1000
 // Read Config file and return JSON Object
 nlohmann::json read_config_file();
 // Create MyProcess Istances from config data and populate the ProcessToBeTracked Vector
